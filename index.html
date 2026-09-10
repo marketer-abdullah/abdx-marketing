@@ -205,6 +205,7 @@
     background:var(--dark);padding:36px;max-width:640px;
     clip-path:polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
     border-left:3px solid var(--accent);
+    transition:transform .3s var(--ease);
   }
   .testimonial p{font-size:17px;font-style:normal;color:#E9E7E1;}
   .testimonial .who{margin-top:16px;color:var(--muted);font-size:14px;}
@@ -387,6 +388,72 @@
     .big-marquee-track{animation:none;}
   }
 
+  .hero-3d-canvas{
+    position:absolute;top:0;right:0;width:56%;height:100%;z-index:1;pointer-events:none;
+    display:block;
+  }
+  @media (max-width:900px){ .hero-3d-canvas{display:none;} }
+
+  /* ---------- ambient idle depth motion ---------- */
+  @keyframes floatY{0%,100%{transform:translateY(0);} 50%{transform:translateY(-7px);}}
+  .icon-chip{animation:floatY 3.6s ease-in-out infinite;}
+  .svc-grid .svc-card:nth-child(2) .icon-chip{animation-delay:.4s;}
+  .svc-grid .svc-card:nth-child(3) .icon-chip{animation-delay:.8s;}
+  .offer-grid .offer-card:nth-child(2) .icon-chip{animation-delay:.3s;}
+
+  @keyframes breathe{0%,100%{transform:scale(1);} 50%{transform:scale(1.08);}}
+  .hero-corner{animation:breathe 4.5s ease-in-out infinite;}
+
+  /* ---------- more 3D micro-interactions ---------- */
+  .brand-badge{transition:transform .55s var(--ease);}
+  .brand:hover .brand-badge{transform:rotateY(360deg);}
+  .footer-brand .brand-badge{transition:transform .55s var(--ease);}
+  .footer-brand:hover .brand-badge{transform:rotateY(360deg);}
+
+  @keyframes spinChip{from{transform:rotateY(0);} to{transform:rotateY(360deg);}}
+  .svc-card:hover .icon-chip, .offer-card:hover .icon-chip{animation:spinChip .6s var(--ease);}
+
+  .btn{transition:transform .2s var(--ease), background .2s var(--ease);}
+  .btn:active{transform:scale(.94) !important;}
+
+  @keyframes lbPop{
+    from{transform:perspective(900px) rotateX(14deg) scale(.85);}
+    to{transform:perspective(900px) rotateX(0deg) scale(1);}
+  }
+  #lightbox.open .lb-box{animation:lbPop .4s var(--ease);}
+
+  /* ---------- sliding nav pill ---------- */
+  nav.main-nav{position:relative;}
+  .nav-pill{
+    position:absolute;top:50%;height:36px;transform:translateY(-50%);
+    background:rgba(255,107,74,.12);border:1px solid var(--accent);
+    clip-path:polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%);
+    transition:left .3s var(--ease), width .3s var(--ease), opacity .25s var(--ease);
+    opacity:0;pointer-events:none;z-index:0;left:0;width:0;
+  }
+  nav.main-nav a{position:relative;z-index:1;}
+
+  /* ---------- cursor contextual label ---------- */
+  #cursor-label{
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:9px;letter-spacing:.06em;
+    color:var(--accent);opacity:0;transition:opacity .2s var(--ease);white-space:nowrap;pointer-events:none;
+  }
+  #cursor-ring.hover #cursor-label{opacity:1;}
+
+  /* ---------- marquee pause on hover ---------- */
+  .marquee-strip:hover .marquee-track, .big-marquee:hover .big-marquee-track{animation-play-state:paused;}
+
+  /* ---------- portfolio curtain reveal ---------- */
+  .port-item-wrap{aspect-ratio:4/5;overflow:hidden;}
+  .port-item-wrap.reveal{opacity:1;transform:none;}
+  .port-item-wrap .port-item{height:100%;transform:translateY(106%);}
+  .port-item-wrap.in-view .port-item{transform:translateY(0);}
+
+  /* ---------- stat pop on count complete ---------- */
+  @keyframes numPop{0%{transform:scale(1);} 50%{transform:scale(1.15);} 100%{transform:scale(1);}}
+  .stat .num.pop{animation:numPop .4s var(--ease);}
+
   /* ---------- responsive ---------- */
   @media (max-width:900px){
     nav.main-nav{display:none;}
@@ -408,7 +475,7 @@
 <body>
 
 <div id="scroll-progress"></div>
-<div id="cursor-ring"></div>
+<div id="cursor-ring"><span id="cursor-label"></span></div>
 <div id="transition-overlay"></div>
 
 <header id="site-header">
@@ -423,6 +490,7 @@
       <span class="brand-word">ABDX</span>
     </a>
     <nav class="main-nav">
+      <span class="nav-pill" id="navPill" aria-hidden="true"></span>
       <a href="#home" data-view="home">Home</a>
       <a href="#services" data-view="services">Services</a>
       <a href="#portfolio" data-view="portfolio">Portfolio</a>
@@ -449,6 +517,7 @@
   <section class="view active" data-view="home" id="view-home">
     <div class="hero">
       <div class="hero-corner"></div>
+      <canvas id="hero3d" class="hero-3d-canvas" aria-hidden="true"></canvas>
       <svg class="hero-bg-mark" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#FAF9F6" stroke-width="3">
         <path d="M200 96 L286 292 H250 L200 172 L150 292 H114 Z"/>
       </svg>
@@ -787,6 +856,7 @@
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 (function(){
   "use strict";
@@ -796,8 +866,10 @@
 
   var grid = document.getElementById("portGrid");
   PORTFOLIO.forEach(function(item){
+    var wrap = document.createElement("div");
+    wrap.className = "port-item-wrap reveal";
     var el = document.createElement("div");
-    el.className = "port-item reveal cut-sm";
+    el.className = "port-item cut-sm";
     var fillEl = document.createElement("div");
     fillEl.className = "fill";
     fillEl.style.backgroundImage = "url(" + item.img + ")";
@@ -813,7 +885,8 @@
     el.appendChild(fillEl);
     el.appendChild(tagEl);
     el.addEventListener("click", function(){ openLightbox(item); });
-    grid.appendChild(el);
+    wrap.appendChild(el);
+    grid.appendChild(wrap);
   });
 
   var lightbox = document.getElementById("lightbox");
@@ -837,6 +910,29 @@
     header.classList.toggle("solid", !onDarkHero);
   }
   window.addEventListener("scroll", updateHeader, {passive:true});
+
+  /* ---------- sliding nav pill ---------- */
+  var navPill = document.getElementById("navPill");
+  var mainNavEl = document.querySelector("nav.main-nav");
+  var mainNavLinks = document.querySelectorAll("nav.main-nav a");
+  function movePillTo(el){
+    if(!navPill || !el || !mainNavEl) return;
+    var navRect = mainNavEl.getBoundingClientRect();
+    var r = el.getBoundingClientRect();
+    navPill.style.left = (r.left - navRect.left - 10) + "px";
+    navPill.style.width = (r.width + 20) + "px";
+    navPill.style.opacity = "1";
+  }
+  function movePillToActive(){
+    var current = document.querySelector('nav.main-nav a[aria-current="page"]');
+    if(current) movePillTo(current); else if(navPill) navPill.style.opacity = "0";
+  }
+  mainNavLinks.forEach(function(a){
+    a.addEventListener("mouseenter", function(){ movePillTo(a); });
+  });
+  if(mainNavEl){
+    mainNavEl.addEventListener("mouseleave", movePillToActive);
+  }
 
   /* ---------- mobile nav ---------- */
   var menuToggle = document.getElementById("menuToggle");
@@ -865,6 +961,7 @@
         else a.removeAttribute("aria-current");
       }
     });
+    if(typeof movePillToActive === "function") movePillToActive();
   }
 
   function switchTo(view){
@@ -872,6 +969,7 @@
     Object.keys(views).forEach(function(k){ views[k].classList.remove("active"); });
     views[view].classList.add("active");
     currentView = view;
+    hero3DActive = (view === "home");
     document.title = titles[view] || titles.home;
     setActiveNav(view);
     updateHeader();
@@ -953,7 +1051,10 @@
         var val = to * eased;
         el.textContent = val.toFixed(decimals) + suffix;
         if(progress < 1) requestAnimationFrame(step);
-        else el.textContent = to.toFixed(decimals) + suffix;
+        else {
+          el.textContent = to.toFixed(decimals) + suffix;
+          el.classList.add("pop");
+        }
       }
       requestAnimationFrame(step);
       counterObserver.unobserve(el);
@@ -1032,10 +1133,22 @@
       ring.style.transform = "translate(" + rx + "px," + ry + "px) translate(-50%,-50%)";
       requestAnimationFrame(loop);
     })();
-    document.querySelectorAll("a, button, .svc-card, .offer-card, .port-item, input, textarea").forEach(function(el){
-      el.addEventListener("mouseenter", function(){ ring.classList.add("hover"); });
-      el.addEventListener("mouseleave", function(){ ring.classList.remove("hover"); });
-    });
+    var cursorLabel = document.getElementById("cursor-label");
+    function bindCursor(selector, label){
+      document.querySelectorAll(selector).forEach(function(el){
+        el.addEventListener("mouseenter", function(){
+          ring.classList.add("hover");
+          cursorLabel.textContent = label || "";
+        });
+        el.addEventListener("mouseleave", function(){
+          ring.classList.remove("hover");
+          cursorLabel.textContent = "";
+        });
+      });
+    }
+    bindCursor("a, button, .svc-card, .offer-card, input, textarea", "");
+    bindCursor(".port-item", "VIEW");
+    bindCursor("#testCarousel", "DRAG");
 
     /* ---------- magnetic buttons ---------- */
     function magnetize(el, strength){
@@ -1055,12 +1168,104 @@
         var r = el.getBoundingClientRect();
         var px = (e.clientX - r.left) / r.width - 0.5;
         var py = (e.clientY - r.top) / r.height - 0.5;
-        el.style.transform = "perspective(700px) rotateX(" + (-py * maxDeg) + "deg) rotateY(" + (px * maxDeg) + "deg) translateY(-4px)";
+        el.style.transform = "perspective(900px) rotateX(" + (-py * maxDeg) + "deg) rotateY(" + (px * maxDeg) + "deg) translateZ(14px) translateY(-4px)";
       });
       el.addEventListener("mouseleave", function(){ el.style.transform = ""; });
     }
-    document.querySelectorAll(".svc-card, .offer-card").forEach(function(el){ tilt(el, 6); });
-    document.querySelectorAll(".port-item").forEach(function(el){ tilt(el, 5); });
+    document.querySelectorAll(".svc-card, .offer-card").forEach(function(el){ tilt(el, 7); });
+    document.querySelectorAll(".port-item").forEach(function(el){ tilt(el, 6); });
+    document.querySelectorAll(".testimonial").forEach(function(el){ tilt(el, 4); });
+  }
+
+  /* ---------- 3D hero centerpiece ---------- */
+  var hero3DActive = (currentView === "home");
+  if(!reduceMotion && fineCursor && window.innerWidth > 900 && typeof THREE !== "undefined"){
+    (function initHero3D(){
+      var canvas = document.getElementById("hero3d");
+      if(!canvas) return;
+
+      var scene = new THREE.Scene();
+      var camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+      camera.position.set(0, 0, 7.5);
+
+      var renderer = new THREE.WebGLRenderer({canvas:canvas, alpha:true, antialias:true});
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+      function sizeCanvas(){
+        var w = canvas.clientWidth || heroEl.clientWidth * 0.56;
+        var h = canvas.clientHeight || heroEl.clientHeight;
+        renderer.setSize(w, h, false);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      }
+
+      var ambient = new THREE.AmbientLight(0xffffff, 0.6);
+      var key = new THREE.DirectionalLight(0xffffff, 0.85);
+      key.position.set(4, 5, 6);
+      var fill = new THREE.DirectionalLight(0xff6b4a, 0.25);
+      fill.position.set(-5, -2, 2);
+      scene.add(ambient, key, fill);
+
+      var group = new THREE.Group();
+
+      var coreGeo = new THREE.IcosahedronGeometry(1.7, 0);
+      var coreMat = new THREE.MeshStandardMaterial({color:0x2B2B2B, flatShading:true, roughness:0.85, metalness:0.05});
+      var core = new THREE.Mesh(coreGeo, coreMat);
+      group.add(core);
+
+      var edges = new THREE.LineSegments(
+        new THREE.EdgesGeometry(coreGeo),
+        new THREE.LineBasicMaterial({color:0xFAF9F6, transparent:true, opacity:0.18})
+      );
+      core.add(edges);
+
+      var accentGeo = new THREE.TetrahedronGeometry(0.62, 0);
+      var accentMat = new THREE.MeshStandardMaterial({color:0xFF6B4A, flatShading:true, roughness:0.7});
+      var accent = new THREE.Mesh(accentGeo, accentMat);
+      accent.position.set(1.9, -1.3, 0.6);
+      group.add(accent);
+
+      var chipGeo = new THREE.TetrahedronGeometry(0.34, 0);
+      var chipMat = new THREE.MeshStandardMaterial({color:0xFAF9F6, flatShading:true, roughness:0.9});
+      var chip = new THREE.Mesh(chipGeo, chipMat);
+      chip.position.set(-1.7, 1.5, -0.4);
+      group.add(chip);
+
+      scene.add(group);
+
+      var targetRotX = 0, targetRotY = 0, curRotX = 0, curRotY = 0;
+      heroEl.addEventListener("mousemove", function(e){
+        var rect = heroEl.getBoundingClientRect();
+        targetRotY = ((e.clientX - rect.left) / rect.width - 0.5) * 0.7;
+        targetRotX = ((e.clientY - rect.top) / rect.height - 0.5) * 0.5;
+      });
+
+      var heroScrollY = 0;
+      window.addEventListener("scroll", function(){ heroScrollY = window.scrollY; }, {passive:true});
+
+      sizeCanvas();
+      window.addEventListener("resize", sizeCanvas);
+
+      function animate(){
+        requestAnimationFrame(animate);
+        if(!hero3DActive) return;
+        group.rotation.y += 0.0035;
+        group.rotation.x += 0.0009;
+        group.rotation.z = Math.min(heroScrollY, 400) * 0.0006;
+        group.position.y = Math.min(heroScrollY, 400) * -0.0022;
+        curRotX += (targetRotX - curRotX) * 0.05;
+        curRotY += (targetRotY - curRotY) * 0.05;
+        accent.rotation.x += 0.01;
+        accent.rotation.y += 0.014;
+        chip.rotation.x -= 0.012;
+        chip.rotation.y -= 0.009;
+        camera.position.x = curRotY * 2;
+        camera.position.y = -curRotX * 2;
+        camera.lookAt(0, 0, 0);
+        renderer.render(scene, camera);
+      }
+      animate();
+    })();
   }
 
   updateHeader();
